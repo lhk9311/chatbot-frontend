@@ -1,51 +1,53 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { io } from "socket.io-client";
+
+const socket = io("http://localhost:3000");
 
 function App() {
   const [message, setMessage] = useState("");
   const [chatList, setChatList] = useState([]);
+  const bottomRef = useRef(null);
 
   useEffect(() => {
-    const fetchMessages = async () => {
-      const res = await fetch("http://localhost:3000/messages");
-      const data = await res.json();
-  
-      const formatted = data.map(item => [
-        { sender: "user", text: item.message },
-        { sender: "bot", text: item.reply }
-      ]).flat();
-  
-      setChatList(formatted);
-    };
-  
-    fetchMessages();
-  }, []);
+    fetch("http://localhost:3000/messages")
+      .then(res => res.json())
+      .then(data => {
+        const formatted = data.map(item => [
+          { sender: "user", text: item.message },
+          { sender: "bot", text: item.reply }
+        ]).flat();
 
-  const sendMessage = async () => {
-    if (message.trim() === "") return;
+        setChatList(formatted);
+      });
 
-    const userMessage = {
-      sender: "user",
-      text: message
-    };
-
-    setChatList(prev => [...prev, userMessage]);
-
-    const res = await fetch("http://localhost:3000/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ message })
+    socket.on("chat response", (reply) => {
+      setChatList(prev => [
+        ...prev,
+        { sender: "bot", text: reply }
+      ]);
     });
 
-    const data = await res.json();
-
-    const botMessage = {
-      sender: "bot",
-      text: data.reply
+    return () => {
+      socket.off("chat response");
     };
+  }, []);
 
-    setChatList(prev => [...prev, botMessage]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatList]);
+
+  const sendMessage = () => {
+    if (message.trim() === "") return;
+
+    const currentMessage = message;
+
+    setChatList(prev => [
+      ...prev,
+      { sender: "user", text: currentMessage }
+    ]);
+
+    socket.emit("chat message", currentMessage);
+
     setMessage("");
   };
 
@@ -78,15 +80,22 @@ function App() {
             </span>
           </div>
         ))}
+
+      <div ref={bottomRef}></div> 
       </div>
 
       <div style={{ marginTop: "10px", display: "flex", gap: "10px" }}>
-        <input
-          style={{ flex: 1, padding: "10px" }}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="문의 내용을 입력하세요"
-        />
+      <input
+        style={{ flex: 1, padding: "10px" }}
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            sendMessage();
+          }
+        }}
+        placeholder="문의 내용을 입력하세요"
+      />
 
         <button onClick={sendMessage}>
           전송
@@ -94,9 +103,6 @@ function App() {
       </div>
     </div>
   );
-
-  
-
 }
 
 export default App;
