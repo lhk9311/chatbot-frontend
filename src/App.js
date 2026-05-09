@@ -27,6 +27,9 @@ function App() {
   const bottomRef = useRef(null)
   const [faqList, setFaqList] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null); // faq
+  const [searchKeyword, setSearchKeyword] = useState(""); // 검색
+  const [pendingRequests, setPendingRequests] = useState([]); // 관리자 문의 패널
+  const [isLoading, setIsLoading] = useState(false); // 로딩
 
   /*
   페이지 최초 실행 시
@@ -49,12 +52,20 @@ function App() {
             loadedMessages.push({
               sender: 'user',
               text: item.message,
+              time: new Date(item.created_at).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+              })
             });
 
             // 챗봇 답변
             loadedMessages.push({
               sender: 'bot',
               text: item.reply,
+              time: new Date(item.created_at).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+              })
             });
 
           });
@@ -81,14 +92,34 @@ function App() {
         });
 
     socket.on("chat response", (reply) => {
+
+      setIsLoading(false);
+
       setChatList(prev => [
         ...prev,
-        { sender: "bot", text: reply }
+        { sender: "bot",
+          text: reply,
+          time: new Date().toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+          })}
       ]);
+    });
+
+    socket.on("admin-request", (data) => {
+
+      console.log("미처리 문의 들어옴", data);
+
+      setPendingRequests(prev => [
+        data,
+        ...prev
+      ]);
+
     });
 
     return () => {
       socket.off("chat response");
+      socket.off("admin-request");
     };
   }, []);
 
@@ -103,8 +134,16 @@ function App() {
 
     setChatList(prev => [
       ...prev,
-      { sender: "user", text: currentMessage }
+      { sender: "user",
+        text: currentMessage,
+        time: new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      }
     ]);
+
+    setIsLoading(true); // 로딩
 
     socket.emit("chat message", currentMessage);
     setMessage("");
@@ -193,6 +232,13 @@ function App() {
     }];
 
   {/*
+  검색어 기반 SW 필터링
+*/}
+  const filteredSoftwareList = softwareList.filter((sw) =>
+      sw.name.toLowerCase().includes(searchKeyword.toLowerCase())
+  );
+
+  {/*
   FAQ 카테고리 목록
   */}
   const faqCategoryMap = {
@@ -255,9 +301,24 @@ function App() {
               사내 SW 자산 목록
             </h2>
 
+            <div style={styles.searchWrapper}>
+
+              <span style={styles.searchIcon}>
+                🔍
+              </span>
+
+              <input
+                  type="text"
+                  placeholder="SW 검색..."
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
+                  style={styles.searchInput}
+              />
+            </div>
+
             <div style={styles.softwareGrid}>
 
-              {softwareList.map((sw) => (
+              {filteredSoftwareList.map((sw) => (
 
                   <div key={sw.name} style={styles.softwareCard}>
 
@@ -285,19 +346,45 @@ function App() {
 
           {/* 오른쪽 채팅 */}
           <div style={styles.chatSection}>
-          <div style={styles.header}>
-            <div>
-              <h1 style={styles.title}>Software Helpdesk</h1>
-              <p style={styles.subtitle}>사내 소프트웨어 라이선스 문의 챗봇</p>
+            <div style={styles.header}>
+              <div>
+                <h1 style={styles.title}>Software Helpdesk</h1>
+                <p style={styles.subtitle}>사내 소프트웨어 라이선스 문의 챗봇</p>
+              </div>
+              <span style={styles.badge}>LIVE</span>
             </div>
-            <span style={styles.badge}>LIVE</span>
-          </div>
 
-          <div style={styles.notice}>
-            재고 · 설치 · 라이선스 · 반납 · 승인 · NetHelper 문의를 입력해보세요.
-          </div>
+            <div style={styles.notice}>
+              재고 · 설치 · 라이선스 · 반납 · 승인 · NetHelper 문의를 입력해보세요.
+            </div>
 
-          {/*
+            <div style={styles.pendingMiniPanel}>
+
+              <div style={styles.pendingMiniTitle}>
+                미처리 문의
+              </div>
+
+              {pendingRequests.length === 0 ? (
+
+                  <div style={styles.emptyPending}>
+                    없음
+                  </div>
+
+              ) : (
+
+                  pendingRequests.slice(0, 3).map((item, index) => (
+
+                      <div key={index} style={styles.pendingMiniItem}>
+                        {item.message}
+                      </div>
+
+                  ))
+
+              )}
+
+            </div>
+
+            {/*
           <div style={styles.quickArea}>
             {faqList.map((faq) => (
                 <button
@@ -314,29 +401,29 @@ function App() {
             {/*
           FAQ 대분류 버튼 영역
           */}
-          <div style={styles.faqTitle}>
-            📌 FAQ
-          </div>
+            <div style={styles.faqTitle}>
+              📌 FAQ
+            </div>
 
-          <div style={styles.categoryArea}>
+            <div style={styles.categoryArea}>
 
-            {Object.keys(faqCategoryMap).map((category) => (
+              {Object.keys(faqCategoryMap).map((category) => (
 
-                <button
-                    key={category}
-                    style={styles.categoryButton}
-                    onClick={() =>
-                        setSelectedCategory(
-                            selectedCategory === category ? null : category
-                        )
-                    }
-                >
-                  {category}
-                </button>
+                  <button
+                      key={category}
+                      style={styles.categoryButton}
+                      onClick={() =>
+                          setSelectedCategory(
+                              selectedCategory === category ? null : category
+                          )
+                      }
+                  >
+                    {category}
+                  </button>
 
-            ))}
+              ))}
 
-          </div>
+            </div>
             {/*
             선택된 카테고리 FAQ 버튼
             */}
@@ -361,49 +448,68 @@ function App() {
             )}
 
 
-          <div style={styles.chatBox}>
-            {chatList.map((chat, index) => (
-                <div
-                    key={index}
-                    style={{
-                      ...styles.messageRow,
-                      justifyContent: chat.sender === "user" ? "flex-end" : "flex-start"
-                    }}
-                >
-                  {chat.sender === "bot" && (
-                      <div style={styles.botAvatar}>🤖</div>
-                  )}
-
+            <div style={styles.chatBox}>
+              {chatList.map((chat, index) => (
                   <div
+                      key={index}
                       style={{
-                        ...styles.bubble,
-                        ...(chat.sender === "user" ? styles.userBubble : styles.botBubble)
+                        ...styles.messageRow,
+                        justifyContent: chat.sender === "user" ? "flex-end" : "flex-start"
                       }}
                   >
-                    {chat.text}
+                    {chat.sender === "bot" && (
+                        <div style={styles.botAvatar}>🤖</div>
+                    )}
+
+                    <div
+                        style={{
+                          ...styles.bubble,
+                          ...(chat.sender === "user"
+                              ? styles.userBubble
+                              : styles.botBubble)
+                        }}
+                    >
+
+                      {/* 채팅 내용 */}
+                      <div style={{ whiteSpace: 'pre-line' }}>
+                        {chat.text}
+                      </div>
+
+                      {/* 시간 */}
+                      <div style={styles.messageTime}>
+                        {chat.time}
+                      </div>
+
+                    </div>
                   </div>
-                </div>
-            ))}
-            <div ref={bottomRef}></div>
-          </div>
+              ))}
 
-          <div style={styles.inputArea}>
-            <input
-                style={styles.input}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") sendMessage();
-                }}
-                placeholder="예) 신청 어떻게 하나요?"
-            />
+              {isLoading && (
+                  <div style={styles.loadingMessage}>
+                    🧠 AI 답변 생성중...
+                  </div>
+              )}
 
-            <button style={styles.button} onClick={() => sendMessage()}>
-              전송
-            </button>
+              <div ref={bottomRef}></div>
+            </div>
+
+            <div style={styles.inputArea}>
+              <input
+                  style={styles.input}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") sendMessage();
+                  }}
+                  placeholder="예) 신청 어떻게 하나요?"
+              />
+
+              <button style={styles.button} onClick={() => sendMessage()}>
+                전송
+              </button>
+            </div>
           </div>
         </div>
-      </div>
       </div>
   );
 }
@@ -642,6 +748,101 @@ const styles = {
     fontWeight: "800",
     padding: "20px 20px 10px",
     color: "#1e293b",
+  },
+
+  messageTime: {
+    fontSize: "11px",
+    marginTop: "6px",
+    opacity: 0.6,
+  },
+
+  searchInput: {
+    width: "100%",
+    padding: "12px 14px 12px 38px",
+    borderRadius: "14px",
+    border: "1px solid #dbe4ff",
+    marginTop: "16px",
+    marginBottom: "20px",
+    fontSize: "14px",
+    outline: "none",
+    boxSizing: "border-box",
+  },
+  searchWrapper: {
+    position: "relative",
+    marginTop: "16px",
+    marginBottom: "20px",
+  },
+
+  searchIcon: {
+    position: "absolute",
+    left: "14px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    fontSize: "14px",
+    opacity: 0.6,
+  },
+  pendingPanel: {
+    marginTop: "30px",
+    borderTop: "1px solid #e5e7eb",
+    paddingTop: "20px",
+  },
+
+  pendingTitle: {
+    fontSize: "16px",
+    fontWeight: "700",
+    marginBottom: "14px",
+    color: "#1e293b",
+  },
+
+  emptyPending: {
+    fontSize: "13px",
+    color: "#94a3b8",
+  },
+
+  pendingItem: {
+    backgroundColor: "#f8fafc",
+    borderRadius: "14px",
+    padding: "12px",
+    marginBottom: "10px",
+  },
+
+  pendingSoftware: {
+    fontSize: "13px",
+    fontWeight: "700",
+    color: "#2563eb",
+  },
+
+  pendingMessage: {
+    marginTop: "4px",
+    fontSize: "13px",
+    color: "#334155",
+  },
+  pendingMiniPanel: {
+    margin: "14px 20px 0",
+    backgroundColor: "#f8fafc",
+    border: "1px solid #dbe4ff",
+    borderRadius: "16px",
+    padding: "14px",
+  },
+
+  pendingMiniTitle: {
+    fontSize: "14px",
+    fontWeight: "700",
+    color: "#2563eb",
+    marginBottom: "10px",
+  },
+
+  pendingMiniItem: {
+    fontSize: "13px",
+    color: "#334155",
+    marginBottom: "6px",
+  },
+  
+  loadingMessage: {
+    fontSize: "13px",
+    color: "#64748b",
+    marginTop: "8px",
+    marginLeft: "8px",
   },
 };
 
