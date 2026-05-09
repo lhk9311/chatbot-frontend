@@ -242,6 +242,9 @@ npm start
 - 직관적인 소프트웨어 문의 인터페이스 제공
 
 
+---
+
+
 # 메인 화면
 
-<img src="./images/chatbot.png" width="800"/>
+<img src="./images/chatbot1.png" width="800"/>
