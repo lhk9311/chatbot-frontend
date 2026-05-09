@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 import { io } from "socket.io-client";
 import adobeLogo from './assets/Adobe Creative Cloud.png';
 import autocadLogo from './assets/AutoCAD.png';
@@ -23,20 +24,55 @@ const socket = io("http://localhost:3000");
 function App() {
   const [message, setMessage] = useState("");
   const [chatList, setChatList] = useState([]);
-  const bottomRef = useRef(null);
-
+  const bottomRef = useRef(null)
   const [faqList, setFaqList] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null); // faq
+
+  /*
+  페이지 최초 실행 시
+  이전 채팅 내역 불러오기
+*/
+  useEffect(() => {
+
+    axios
+        .get('http://localhost:3000/messages')
+
+        .then((res) => {
+
+          const loadedMessages = [];
+
+          // DB 채팅 데이터를
+          // 화면용 messages 형태로 변환
+          res.data.forEach((item) => {
+
+            // 사용자 질문
+            loadedMessages.push({
+              sender: 'user',
+              text: item.message,
+            });
+
+            // 챗봇 답변
+            loadedMessages.push({
+              sender: 'bot',
+              text: item.reply,
+            });
+
+          });
+
+          // 화면에 채팅 세팅
+          setChatList(loadedMessages);
+
+        })
+
+        .catch((err) => {
+
+          console.error('채팅 불러오기 실패:', err);
+
+        });
+
+  }, []);
 
   useEffect(() => {
-    fetch("http://localhost:3000/chat/messages")
-        .then(res => res.json())
-        .then(data => {
-          const formatted = data.map(item => [
-            { sender: "user", text: item.message },
-            { sender: "bot", text: item.reply }
-          ]).flat();
-          setChatList(formatted);
-        });
 
     fetch("http://localhost:3000/chat/faqs")
         .then(res => res.json())
@@ -154,8 +190,58 @@ function App() {
       name: "Xshell",
       type: "영구제 / 키형",
       image: xshellLogo
-    }
-  ];
+    }];
+
+  {/*
+  FAQ 카테고리 목록
+  */}
+  const faqCategoryMap = {
+
+    "신청/승인": [
+      "신청 어떻게 하나요?",
+      "결재 프로세스는 어떻게 되나요?",
+      "VDI환경은 어떻게 하나요?"
+    ],
+
+    "재고/구매": [
+      "구매 후 실 지급까지 얼마나 걸리나요?",
+      "당장 필요한 경우는 어떻게 하나요?"
+    ],
+
+    "설치": [
+      "설치 링크가 차단되는데 어떻게 하나요?",
+      "다운로드는 어디서 하나요?"
+    ],
+
+    "라이선스/키": [
+      "인증키는 어디서 받나요?",
+      "계정 할당 방식인가요?",
+      "BP인력도 사용 가능한가요?"
+    ],
+
+    "기간제/갱신": [
+      "라이선스 연장 가능한가요?",
+      "갱신일자가 지났으면 어떻게 하나요?"
+    ],
+
+    "반납/이관": [
+      "다른 사람에게 이관 가능한가요?",
+      "라이선스 반납 방법이 어떻게 되나요?",
+      "퇴사자 라이선스는 어떻게 되나요?"
+    ],
+
+    "NetHelper": [
+      "NetHelper 차단됩니다.",
+      "삭제키 발급 어떻게 하나요?",
+      "사용자 변경 요청 / 사용자 인증 불가",
+      "NetHelper 인가 처리 문의"
+    ],
+
+    "기술지원": [
+      "프로그램 실행 안됩니다."
+    ]
+  };
+
 
   return (
       <div style={styles.page}>
@@ -225,6 +311,56 @@ function App() {
           </div>
           */}
 
+            {/*
+          FAQ 대분류 버튼 영역
+          */}
+          <div style={styles.faqTitle}>
+            📌 FAQ
+          </div>
+
+          <div style={styles.categoryArea}>
+
+            {Object.keys(faqCategoryMap).map((category) => (
+
+                <button
+                    key={category}
+                    style={styles.categoryButton}
+                    onClick={() =>
+                        setSelectedCategory(
+                            selectedCategory === category ? null : category
+                        )
+                    }
+                >
+                  {category}
+                </button>
+
+            ))}
+
+          </div>
+            {/*
+            선택된 카테고리 FAQ 버튼
+            */}
+            {selectedCategory && (
+
+                <div style={styles.faqArea}>
+
+                  {faqCategoryMap[selectedCategory].map((faq) => (
+
+                      <button
+                          key={faq}
+                          style={styles.faqButton}
+                          onClick={() => sendMessage(faq)}
+                      >
+                        {faq}
+                      </button>
+
+                  ))}
+
+                </div>
+
+            )}
+
+
           <div style={styles.chatBox}>
             {chatList.map((chat, index) => (
                 <div
@@ -259,7 +395,7 @@ function App() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") sendMessage();
                 }}
-                placeholder="예) 인텔리제이 재고 있어요?"
+                placeholder="예) 신청 어떻게 하나요?"
             />
 
             <button style={styles.button} onClick={() => sendMessage()}>
@@ -346,6 +482,7 @@ const styles = {
     flex: 1,
     padding: "20px",
     overflowY: "auto",
+    marginTop: "30px",
   },
   messageRow: {
     display: "flex",
@@ -410,9 +547,7 @@ const styles = {
     display: "grid",
     gridTemplateColumns: "repeat(2, 1fr)",
     gap: "12px",
-    padding: "18px 20px 0",
-
-    maxHeight: "260px",
+    padding: "18px 20px 40P",
     overflowY: "auto",
   },
   softwareCard: {
@@ -466,6 +601,47 @@ const styles = {
     flexDirection: "column",
     overflow: "hidden",
     boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+  },
+
+  categoryArea: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "10px",
+    padding: "16px 20px 0",
+  },
+
+  categoryButton: {
+    border: "none",
+    backgroundColor: "#2563eb",
+    color: "#fff",
+    borderRadius: "20px",
+    padding: "10px 16px",
+    cursor: "pointer",
+    fontSize: "13px",
+    fontWeight: 600,
+  },
+
+  faqArea: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "10px",
+    padding: "14px 20px",
+  },
+
+  faqButton: {
+    border: "1px solid #cbd5e1",
+    backgroundColor: "#ffffff",
+    borderRadius: "18px",
+    padding: "8px 14px",
+    cursor: "pointer",
+    fontSize: "13px",
+  },
+
+  faqTitle: {
+    fontSize: "18px",
+    fontWeight: "800",
+    padding: "20px 20px 10px",
+    color: "#1e293b",
   },
 };
 
