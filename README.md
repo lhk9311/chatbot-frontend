@@ -240,3 +240,8 @@ npm start
 - AI 기반 자연어 응답 UX 개선
 - 관리자 문의 대응 프로세스 시각화
 - 직관적인 소프트웨어 문의 인터페이스 제공
+
+
+# 메인 화면
+
+<img src="./images/chatbot.png" width="800"/>
