@@ -18,7 +18,10 @@ import toadLogo from './assets/Toad for Oracle.jpg';
 import webstormLogo from './assets/WebStorm.png';
 import xshellLogo from './assets/Xshell.jpg';
 
-const socket = io("http://52.78.28.91:4000");
+//const socket = io("http://52.78.28.91:4000");
+// 수정
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://52.78.28.91:4000";
+const socket = io(BACKEND_URL);
 
 function App() {
   const [message, setMessage] = useState("");
@@ -33,7 +36,8 @@ function App() {
 
   useEffect(() => {
     axios
-        .get('http://52.78.28.91:4000/messages')
+        //.get('http://52.78.28.91:4000/messages')
+        .get(`${BACKEND_URL}/messages`)
         .then((res) => {
           const loadedMessages = [];
           res.data.forEach((item) => {
@@ -54,7 +58,8 @@ function App() {
   }, []);
 
   useEffect(() => {
-    fetch("http://52.78.28.91:4000/chat/faqs")
+    //fetch("http://52.78.28.91:4000/chat/faqs")
+    fetch(`${BACKEND_URL}/chat/faqs`)
         .then(res => res.json())
         .then(data => setFaqList(data));
 
